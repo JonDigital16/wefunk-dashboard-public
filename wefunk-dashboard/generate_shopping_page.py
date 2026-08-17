@@ -694,10 +694,10 @@ start = template.find('<div class="card shopping-page">')
 if start == -1:
     start = template.find('<div class="card">')
 
-end = template.rfind("</body>")
+end = template.rfind("</main>")
 
 if start == -1 or end == -1:
-    raise SystemExit("Could not find replaceable page body in shopping.html")
+    raise SystemExit("Could not find replaceable <main> content in shopping.html")
 
 page = template[:start] + shopping_card + "\n" + template[end:]
 

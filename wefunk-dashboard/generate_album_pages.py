@@ -97,9 +97,21 @@ for album_slug, album_data in sorted(albums.items(), key=lambda kv: kv[1]["album
 </div>
 """
 
-    start = template.find('<div class="card">')
-    end = template.rfind("</body>")
-    page = template[:start] + card + "\n" + template[end:]
+    start = template.find("<main>")
+    end = template.rfind("</main>")
+
+    if start == -1 or end == -1:
+        raise SystemExit("Could not locate <main> page boundaries")
+
+    start += len("<main>")
+
+    page = template[:start] + "\n" + card + "\n" + template[end:]
+
+    page = page.replace(
+        "<title>Recommended Albums</title>",
+        f"<title>{esc(album)} · {esc(artist)}</title>",
+        1,
+    )
 
     out = ALBUM_DIR / f"{album_slug}.html"
     out.write_text(page, encoding="utf-8")

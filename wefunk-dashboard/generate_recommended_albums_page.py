@@ -50,10 +50,20 @@ card = f"""
 </div>
 """
 
-start = template.find('<div class="card">')
-end = template.rfind("</body>")
+start = template.find("<main>")
+end = template.rfind("</main>")
 
-page = template[:start] + card + "\n" + template[end:]
+if start == -1 or end == -1:
+    raise SystemExit("Could not locate <main> page boundaries")
+
+start += len("<main>")
+
+page = template[:start] + "\n" + card + "\n" + template[end:]
+page = page.replace(
+    "<title>Smart Shopping List</title>",
+    "<title>Recommended Albums</title>",
+    1,
+)
 OUT.write_text(page, encoding="utf-8")
 
 print(f"Wrote: {OUT}")

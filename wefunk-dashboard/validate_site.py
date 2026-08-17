@@ -3,7 +3,7 @@
 import os
 from pathlib import Path
 
-SITE = Path(os.environ.get("WEFUNK_SITE_DIR", str(Path(__file__).resolve().parents[1] / "site")))
+SITE = Path(os.environ.get("WEFUNK_SITE_DIR", "/Users/jonathan/scripts/wefunk-dashboard/site"))
 
 required_files = [
     "index.html",
@@ -75,6 +75,83 @@ for file, markers in ui_checks.items():
         for marker in markers:
             if marker not in html:
                 missing.append(f"{file} missing UI marker: {marker}")
+
+
+
+# ------------------------------------------------------------------
+# HTML STRUCTURE / PAGE IDENTITY VALIDATION
+# ------------------------------------------------------------------
+
+page_title_checks = {
+    "shopping.html": "Smart Shopping List",
+    "recommended-albums.html": "Recommended Albums",
+    "albums.html": "Album Index",
+    "artists.html": "Artist Index",
+}
+
+for file, expected_title in page_title_checks.items():
+    path = SITE / file
+
+    if not path.exists():
+        continue
+
+    html = path.read_text(encoding="utf-8")
+
+    expected_title_tag = f"<title>{expected_title}</title>"
+
+    if expected_title_tag not in html:
+        missing.append(
+            f"{file} has incorrect page title; expected {expected_title!r}"
+        )
+
+    if html.count("<body") != 1 or html.count("</body>") != 1:
+        missing.append(
+            f"{file} has invalid body structure "
+            f"({html.count('<body')}/{html.count('</body>')})"
+        )
+
+    if html.count("<main") != 1 or html.count("</main>") != 1:
+        missing.append(
+            f"{file} has invalid main structure "
+            f"({html.count('<main')}/{html.count('</main>')})"
+        )
+
+
+# These pages must never inherit the Smart Shopping List body.
+for file in (
+    "recommended-albums.html",
+    "albums.html",
+    "artists.html",
+):
+    path = SITE / file
+
+    if path.exists():
+        html = path.read_text(encoding="utf-8")
+
+        if "<h2>Smart Shopping List</h2>" in html:
+            missing.append(
+                f"{file} contains Smart Shopping List page content"
+            )
+
+
+# Validate every generated individual album page.
+for path in album_pages:
+    html = path.read_text(encoding="utf-8")
+
+    if "<h2>Smart Shopping List</h2>" in html:
+        missing.append(
+            f"albums/{path.name} contains Smart Shopping List page content"
+        )
+
+    if html.count("<body") != 1 or html.count("</body>") != 1:
+        missing.append(
+            f"albums/{path.name} has invalid body structure"
+        )
+
+    if html.count("<main") != 1 or html.count("</main>") != 1:
+        missing.append(
+            f"albums/{path.name} has invalid main structure"
+        )
 
 
 

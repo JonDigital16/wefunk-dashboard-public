@@ -14,11 +14,11 @@ from common import artist_slugify, esc
 SITE = Path(
     os.environ.get(
         "WEFUNK_SITE_DIR",
-        str(Path(__file__).resolve().parents[1] / "site"),
+        "/Users/jonathan/scripts/wefunk-dashboard/site",
     )
 )
 
-EXPORTS = Path(os.environ.get("WEFUNK_EXPORT_DIR", Path(os.environ.get("WEFUNK_DATA_DIR", Path.home() / ".local" / "share" / "wefunk")) / "exports")).expanduser().resolve()
+EXPORTS = Path("/Volumes/MEDIA/wefunk/exports")
 SOURCE = EXPORTS / "wefunk_owned_tracks_enriched.csv"
 TEMPLATE = SITE / "albums.html"
 OUT = SITE / "artists.html"
@@ -485,19 +485,27 @@ css = """
 
 template = TEMPLATE.read_text(encoding="utf-8")
 
-start = template.find('<div class="card">')
-end = template.rfind("</body>")
+start = template.find("<main>")
+end = template.rfind("</main>")
 
 if start == -1 or end == -1:
-    raise SystemExit("Could not locate page content boundaries")
+    raise SystemExit("Could not locate <main> page boundaries")
 
+start += len("<main>")
 page = (
     template[:start]
+    + "\n"
     + featured_card
     + "\n"
     + index_card
     + "\n"
     + template[end:]
+)
+
+page = page.replace(
+    "<title>Album Index</title>",
+    "<title>Artist Index</title>",
+    1,
 )
 
 page = page.replace(
