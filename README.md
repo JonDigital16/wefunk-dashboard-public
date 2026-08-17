@@ -7,7 +7,7 @@
 
 ------------------------------------------------------------------------
 
-![WEFUNK Dashboard](docs/images/1heroscreenshot.png)
+<img width="2499" height="852" alt="Screenshot 2026-08-17 at 3 05 10 PM" src="https://github.com/user-attachments/assets/c1b19d13-ac8f-447f-a47a-755fabac5c03" />
 
 ## Highlights
 
@@ -25,47 +25,47 @@
 
 ### Homepage
 
-![Homepage](docs/images/2homepage.png)
+<img width="2498" height="993" alt="Screenshot 2026-08-17 at 3 06 26 PM" src="https://github.com/user-attachments/assets/855df213-b8aa-495b-a1e6-58191ed4b21d" />
 
 ### Episode Browser
 
-![Episode Browser](docs/images/3episodebrowser.png)
+<img width="1477" height="945" alt="Screenshot 2026-08-17 at 3 07 06 PM" src="https://github.com/user-attachments/assets/6c3fdea7-acc6-408c-b681-6256ab64226f" />
 
 ### Artist Pages
 
-![Artist Pages](docs/images/4artistpages.png)
+<img width="1235" height="1127" alt="Screenshot 2026-08-17 at 3 20 38 PM" src="https://github.com/user-attachments/assets/b684f6f0-e273-4e65-a9c6-c0dff300691c" />
 
 ### Album Index
 
-![Album Index](docs/images/5albumindex.png)
+<img width="1226" height="560" alt="Screenshot 2026-08-17 at 3 22 50 PM" src="https://github.com/user-attachments/assets/6b419b32-2df1-4d03-915f-93edf4f5b202" />
 
 ### Album Page
 
-![Album Page](docs/images/6albumpage.png)
+<img width="2379" height="765" alt="Screenshot 2026-08-17 at 3 24 10 PM" src="https://github.com/user-attachments/assets/14249a68-8ab6-4034-bcf9-715385f235bc" />
 
 ### Genre Index
 
-![Genre Index](docs/images/7genreindex.png)
+<img width="2453" height="1092" alt="Screenshot 2026-08-17 at 3 10 56 PM" src="https://github.com/user-attachments/assets/dd520888-c709-4c81-a2d0-bf6e0a975227" />
 
 ### Search
 
-![Search](docs/images/8search.png)
+<img width="783" height="876" alt="Screenshot 2026-08-17 at 3 11 25 PM" src="https://github.com/user-attachments/assets/7a9d67c3-7cd0-4683-8027-16682ed230fe" />
 
 ### Collection Goals
 
-![Collection Goals](docs/images/9collectiongoals.png)
+<img width="2455" height="376" alt="Screenshot 2026-08-17 at 3 13 14 PM" src="https://github.com/user-attachments/assets/4be96c67-70a0-40de-be92-77d0fed3296d" />
 
 ### Statistics
 
-![Statistics](docs/images/10stats.png)
+<img width="2457" height="915" alt="Screenshot 2026-08-17 at 3 14 25 PM" src="https://github.com/user-attachments/assets/63cb6a6c-4ac6-4dbe-b235-dedc39af9bf5" />
 
-### Reports
+### Missing Tracks
 
-![Reports](docs/images/11reports.png)
+<img width="1786" height="629" alt="Screenshot 2026-08-17 at 3 16 59 PM" src="https://github.com/user-attachments/assets/bb4ad45b-10d3-4653-984f-331668fcdcb4" />
 
 ### WEFUNK DNA
 
-![WEFUNK DNA](docs/images/12wefunkdna.png)
+<img width="2494" height="1138" alt="Screenshot 2026-08-17 at 3 18 04 PM" src="https://github.com/user-attachments/assets/3cac27cf-7dd1-4a28-b8b7-ab63dc8e266c" />
 
 ## How It Works
 
