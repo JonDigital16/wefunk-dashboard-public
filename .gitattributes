@@ -1,0 +1,9 @@
+# Generated dashboard output
+site/** linguist-generated=true
+
+# Generated exports and playlists
+exports/** linguist-generated=true
+playlists/** linguist-generated=true
+
+# Backup and generated report files
+site-backup-*/** linguist-generated=true

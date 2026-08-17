@@ -1,0 +1,14 @@
+#!/bin/zsh
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ROOT="${WEFUNK_PROJECT_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+SITE="${WEFUNK_SITE_DIR:-$ROOT/site}"
+
+if [ -f "$SITE/index.html" ]; then
+  echo "✅ WEFUNK dashboard site exists"
+  echo "$SITE"
+else
+  echo "❌ WEFUNK dashboard site not found"
+  echo "$SITE"
+  exit 1
+fi

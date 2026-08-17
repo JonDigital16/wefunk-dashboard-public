@@ -1,0 +1,168 @@
+#!/bin/zsh
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ROOT="${WEFUNK_PROJECT_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+
+# Load project-local configuration if present.
+# Existing exported environment variables take precedence.
+if [ -f "$ROOT/.env" ]; then
+  while IFS= read -r line || [ -n "$line" ]; do
+    [[ -z "$line" ]] && continue
+    [[ "$line" == \#* ]] && continue
+
+    key="${line%%=*}"
+    value="${line#*=}"
+
+    [[ "$key" == "$line" ]] && continue
+
+    if [[ -z "${(P)key+x}" ]]; then
+      export "$key=$value"
+    fi
+  done < "$ROOT/.env"
+fi
+
+DATA_ROOT="${WEFUNK_DATA_DIR:-$HOME/.local/share/wefunk}"
+MUSIC_ROOT="${WEFUNK_MUSIC_DIR:-$HOME/Music}"
+EPISODE_ROOT="${WEFUNK_EPISODE_DIR:-$MUSIC_ROOT/wefunkradio mixes}"
+SITE_ROOT="${WEFUNK_SITE_DIR:-$ROOT/site}"
+VENV="${WEFUNK_VENV:-$ROOT/.venv}"
+PYTHON="${WEFUNK_PYTHON:-$VENV/bin/python}"
+
+DB_FILE="${WEFUNK_DB_FILE:-$DATA_ROOT/db/wefunk.db}"
+ENGINE_DB="$DATA_ROOT/db/wefunk_engine.db"
+
+echo "============================================================"
+echo " WEFUNK Dashboard - first-run check"
+echo "============================================================"
+echo
+
+echo "Project:"
+echo "  $ROOT"
+echo
+echo "Data:"
+echo "  $DATA_ROOT"
+echo
+echo "Music:"
+echo "  $MUSIC_ROOT"
+echo
+echo "WEFUNK episodes:"
+echo "  $EPISODE_ROOT"
+echo
+echo "Generated site:"
+echo "  $SITE_ROOT"
+echo
+
+echo "Creating runtime directories..."
+
+mkdir -p \
+  "$DATA_ROOT/db" \
+  "$DATA_ROOT/exports" \
+  "$DATA_ROOT/json" \
+  "$DATA_ROOT/artwork/episodes" \
+  "$DATA_ROOT/playlists" \
+  "$DATA_ROOT/state" \
+  "$DATA_ROOT/timing-cache" \
+  "$SITE_ROOT"
+
+echo "✅ Runtime directories ready"
+
+echo
+echo "Checking Python environment..."
+
+if [ ! -x "$PYTHON" ]; then
+  echo "❌ Python environment not found:"
+  echo "   $PYTHON"
+  echo
+  echo "Create it with:"
+  echo
+  echo "   python3 -m venv .venv"
+  echo "   .venv/bin/python -m pip install -r requirements.txt"
+  exit 1
+fi
+
+if ! "$PYTHON" - <<'PY' >/dev/null 2>&1
+import flask
+import mutagen
+import numpy
+import PIL
+import rapidfuzz
+import requests
+import waitress
+import dotenv
+PY
+then
+  echo "❌ One or more Python dependencies are missing."
+  echo
+  echo "Run:"
+  echo
+  echo "   .venv/bin/python -m pip install -r requirements.txt"
+  exit 1
+fi
+
+echo "✅ Python environment ready"
+
+echo
+echo "Checking music directory..."
+
+if [ -d "$MUSIC_ROOT" ]; then
+  echo "✅ Music directory exists"
+else
+  echo "⚠️ Music directory does not exist:"
+  echo "   $MUSIC_ROOT"
+fi
+
+echo
+echo "Checking WEFUNK metadata..."
+
+JSON_COUNT=$(find "$DATA_ROOT/json" -type f -name '*.json' 2>/dev/null | wc -l | tr -d ' ')
+
+if [ "$JSON_COUNT" -gt 0 ]; then
+  echo "✅ Found $JSON_COUNT WEFUNK metadata JSON file(s)"
+else
+  echo "⚠️ No WEFUNK metadata JSON files found in:"
+  echo "   $DATA_ROOT/json"
+fi
+
+echo
+echo "Checking databases..."
+
+if [ -f "$DB_FILE" ]; then
+  echo "✅ Library database exists:"
+  echo "   $DB_FILE"
+else
+  echo "⚠️ Library database has not been created yet:"
+  echo "   $DB_FILE"
+fi
+
+if [ -f "$ENGINE_DB" ]; then
+  echo "✅ Engine database exists:"
+  echo "   $ENGINE_DB"
+else
+  echo "⚠️ Engine database has not been created yet:"
+  echo "   $ENGINE_DB"
+fi
+
+echo
+echo "============================================================"
+echo " First-run check complete"
+echo "============================================================"
+echo
+
+if [ "$JSON_COUNT" -eq 0 ]; then
+  echo "Next:"
+  echo "  Add WEFUNK metadata to $DATA_ROOT/json"
+  echo "  or configure WEFUNK_SCRAPER_SCRIPT in .env."
+  echo
+fi
+
+if [ ! -f "$DB_FILE" ]; then
+  echo "The dashboard cannot be built until its WEFUNK database"
+  echo "has been created."
+  echo
+fi
+
+echo "When required data is ready, run:"
+echo
+echo "  ./bin/wefunk-scan"
+echo

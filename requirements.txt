@@ -1,0 +1,8 @@
+Flask
+Pillow
+mutagen
+numpy
+python-dotenv
+rapidfuzz
+requests
+waitress

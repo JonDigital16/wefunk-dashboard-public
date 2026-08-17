@@ -1,0 +1,8 @@
+#!/bin/zsh
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ROOT="${WEFUNK_PROJECT_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+STEPS="${WEFUNK_BUILD_STEPS:-$ROOT/wefunk-dashboard/build_steps.txt}"
+
+cat "$STEPS"

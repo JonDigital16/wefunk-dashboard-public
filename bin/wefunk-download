@@ -1,0 +1,98 @@
+#!/bin/zsh
+set -e
+
+SOURCE="${WEFUNK_DOWNLOADER_DIR:-}"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT="${WEFUNK_PROJECT_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+ROOT="$PROJECT"
+
+# Load project-local configuration if present.
+# Existing exported environment variables take precedence.
+if [ -f "$ROOT/.env" ]; then
+  while IFS= read -r line || [ -n "$line" ]; do
+    [[ -z "$line" ]] && continue
+    [[ "$line" == \#* ]] && continue
+
+    key="${line%%=*}"
+    value="${line#*=}"
+
+    [[ "$key" == "$line" ]] && continue
+
+    # Do not overwrite a value already supplied by the environment.
+    if [[ -z "${(P)key+x}" ]]; then
+      export "$key=$value"
+    fi
+  done < "$ROOT/.env"
+fi
+
+
+PYTHON="$PROJECT/.venv/bin/python"
+
+JSON_REFRESHER="$PROJECT/wefunk-dashboard/refresh_wefunk_show_json.py"
+LRC_EXPORTER="$PROJECT/wefunk-dashboard/export_wefunk_lrc.py"
+ART_DOWNLOADER="$PROJECT/wefunk-dashboard/download_wefunk_art.py"
+ART_EMBEDDER="$PROJECT/wefunk-dashboard/embed_wefunk_episode_art.py"
+
+MUSIC_ROOT="${WEFUNK_MUSIC_DIR:-$HOME/Music}"
+DEST="${WEFUNK_EPISODE_DIR:-$MUSIC_ROOT/wefunkradio mixes}"
+DATA_ROOT="${WEFUNK_DATA_DIR:-$HOME/.local/share/wefunk}"
+
+echo "⬇️ Downloading latest WEFUNK episodes..."
+echo "   Destination: $DEST"
+echo
+
+mkdir -p "$DEST"
+
+cd "$SOURCE" || exit 1
+
+./batch_wefunkdl_media.sh
+
+echo
+echo "📚 Refreshing WEFUNK show metadata..."
+
+if [[ ! -f "$JSON_REFRESHER" ]]; then
+    echo "❌ WEFUNK JSON refresher not found:"
+    echo "   $JSON_REFRESHER"
+    exit 1
+fi
+
+"$PYTHON" "$JSON_REFRESHER"
+
+echo
+echo "📝 Generating synchronized WEFUNK tracklists..."
+
+if [[ ! -f "$LRC_EXPORTER" ]]; then
+    echo "❌ Timed LRC exporter not found:"
+    echo "   $LRC_EXPORTER"
+    exit 1
+fi
+
+"$PYTHON" "$LRC_EXPORTER"
+
+echo
+echo "🖼️ Syncing WEFUNK episode artwork..."
+
+if [[ ! -f "$ART_DOWNLOADER" ]]; then
+    echo "❌ Episode artwork downloader not found:"
+    echo "   $ART_DOWNLOADER"
+    exit 1
+fi
+
+"$PYTHON" "$ART_DOWNLOADER"
+
+echo
+echo "🎨 Embedding episode artwork into WEFUNK audio..."
+
+if [[ ! -f "$ART_EMBEDDER" ]]; then
+    echo "❌ Episode artwork embedder not found:"
+    echo "   $ART_EMBEDDER"
+    exit 1
+fi
+
+"$PYTHON" "$ART_EMBEDDER"
+
+echo
+echo "✅ WEFUNK episode download and asset sync complete."
+echo "   Audio:    $DEST"
+echo "   Metadata: $DATA_ROOT/json"
+echo "   Artwork:  $DATA_ROOT/artwork/episodes"

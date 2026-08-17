@@ -1,0 +1,32 @@
+#!/bin/zsh
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ROOT="${WEFUNK_PROJECT_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+SITE="${WEFUNK_SITE_DIR:-$ROOT/site}"
+JSON="$SITE/now-playing.json"
+LABEL="${WEFUNK_NOWPLAYING_LABEL:-org.wefunk.dashboard.nowplaying}"
+VENV="${WEFUNK_VENV:-$ROOT/.venv}"
+PYTHON="${WEFUNK_PYTHON:-$VENV/bin/python}"
+
+launchctl list | grep "$LABEL" || echo "ℹ️ LaunchAgent not loaded"
+
+if [ ! -f "$JSON" ]; then
+  echo "❌ now-playing.json not found: $JSON"
+  exit 1
+fi
+
+"$PYTHON" - "$JSON" <<'PYJSON'
+from pathlib import Path
+import json
+import sys
+
+p = Path(sys.argv[1])
+
+try:
+    data = json.loads(p.read_text(encoding="utf-8"))
+except Exception as exc:
+    print(f"❌ Could not read {p}: {exc}")
+    raise SystemExit(1)
+
+print(json.dumps(data, indent=2, ensure_ascii=False))
+PYJSON

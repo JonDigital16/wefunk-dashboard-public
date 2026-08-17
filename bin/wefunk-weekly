@@ -1,0 +1,26 @@
+#!/bin/zsh
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ROOT="${WEFUNK_PROJECT_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+
+echo "════════════════════════════════════════════"
+echo "🎧 WEFUNK Weekly Update"
+echo "════════════════════════════════════════════"
+echo
+
+echo "1/3 ⬇️  Downloading latest WEFUNK episode(s)..."
+"$ROOT/bin/wefunk-download"
+
+echo
+echo "2/3 🖼️  Updating artwork..."
+"$ROOT/bin/wefunk-art"
+
+echo
+echo "3/3 🎵 Updating WEFUNK database, reports, and dashboard..."
+"$ROOT/bin/wefunk-update"
+
+echo
+echo "════════════════════════════════════════════"
+echo "✅ WEFUNK weekly update complete"
+echo "════════════════════════════════════════════"

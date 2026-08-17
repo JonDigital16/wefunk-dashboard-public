@@ -1,0 +1,63 @@
+#!/bin/zsh
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ROOT="${WEFUNK_PROJECT_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+
+# Load project-local configuration if present.
+# Existing exported environment variables take precedence.
+if [ -f "$ROOT/.env" ]; then
+  while IFS= read -r line || [ -n "$line" ]; do
+    [[ -z "$line" ]] && continue
+    [[ "$line" == \#* ]] && continue
+
+    key="${line%%=*}"
+    value="${line#*=}"
+
+    [[ "$key" == "$line" ]] && continue
+
+    # Do not overwrite a value already supplied by the environment.
+    if [[ -z "${(P)key+x}" ]]; then
+      export "$key=$value"
+    fi
+  done < "$ROOT/.env"
+fi
+
+VENV="${WEFUNK_VENV:-$ROOT/.venv}"
+PYTHON="${WEFUNK_PYTHON:-$VENV/bin/python}"
+APP="$ROOT/wefunk-dashboard"
+
+if [ -f "$HOME/.wefunk-env" ]; then
+  source "$HOME/.wefunk-env"
+fi
+
+if [ -f "$HOME/.config/wefunk/navidrome.env" ]; then
+  source "$HOME/.config/wefunk/navidrome.env"
+fi
+
+echo "🔄 Syncing WEFUNK play counts from Navidrome..."
+
+if [ -z "$ND_URL" ]; then
+  read "ND_URL?Navidrome URL: "
+  export ND_URL
+fi
+
+if [ -z "$ND_USER" ]; then
+  read "ND_USER?Navidrome username: "
+  export ND_USER
+fi
+
+if [ -z "$ND_PASS" ]; then
+  read -s "ND_PASS?Navidrome password: "
+  echo
+  export ND_PASS
+fi
+
+"$PYTHON" "$APP/export_navidrome_play_counts.py"
+
+echo
+echo "Rebuilding dashboard safely..."
+"$ROOT/bin/wefunk-dashboard"
+
+echo
+echo "✅ WEFUNK play count sync complete."

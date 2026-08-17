@@ -1,0 +1,13 @@
+#!/bin/zsh
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ROOT="${WEFUNK_PROJECT_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+
+echo "WEFUNK project:"
+echo "  $ROOT"
+echo
+echo "Dashboard builder:"
+echo "  $ROOT/bin/wefunk-dashboard"
+echo
+echo "Dashboard application:"
+echo "  $ROOT/wefunk-dashboard"
