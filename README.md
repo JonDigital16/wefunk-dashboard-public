@@ -587,7 +587,7 @@ Please:
 
 ## License
 
-A project license has not yet been selected.
+WEFUNK Dashboard is released under the [MIT License](LICENSE).
 
 ## Acknowledgements
 
