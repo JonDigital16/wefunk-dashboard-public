@@ -155,39 +155,96 @@ ND_PASS
 
 Your real `.env` file is ignored by Git and should never be committed.
 
-## First-Run Check
+## First-Run Setup
 
 After installing dependencies and configuring `.env`, run:
 
-``` bash
+```bash
 ./bin/wefunk-init
 ```
 
 The first-run check:
 
--   creates the runtime directory structure;
--   verifies the Python environment and required packages;
--   checks your configured music directory;
--   checks for WEFUNK metadata;
--   checks for required databases;
--   reports what still needs to be configured.
+- creates the runtime directory structure;
+- verifies the Python environment and required packages;
+- checks your configured music directory;
+- checks for WEFUNK metadata;
+- checks for required databases;
+- reports what still needs to be configured.
 
-It does not perform a full music-library scan.
+It does not modify your music library or perform a full scan.
 
-A new installation may initially report that WEFUNK metadata and
-databases are missing. Add playlist JSON data to:
+### Add WEFUNK playlist metadata
 
-``` text
+Place at least one WEFUNK playlist JSON export in:
+
+```text
 $WEFUNK_DATA_DIR/json
 ```
 
-or configure the optional scraper:
+The filename must match:
 
-``` text
+```text
+wefunk_shows_<first-show>_<last-show>.json
+```
+
+For example:
+
+```text
+wefunk_shows_1_1300.json
+```
+
+Each show should contain its playlist entries under `playlistbox`.
+
+An external WEFUNK playlist scraper can also be used to collect or
+refresh metadata. Configure its location with:
+
+```text
 WEFUNK_SCRAPER_SCRIPT=/path/to/scraper
 ```
 
-Once the required source data is available, run a full scan.
+The scraper integration is optional and is not required when compatible
+playlist JSON already exists.
+
+### Initialize and import the primary database
+
+The first metadata import is intentionally a two-step process.
+
+First run a dry run:
+
+```bash
+./bin/wefunk-import
+```
+
+On a new installation this creates the empty primary `wefunk.db`,
+validates the newest `wefunk_shows_*.json` file, and reports the shows
+and tracks that would be imported.
+
+Review the report. If it looks correct, apply the import:
+
+```bash
+./bin/wefunk-import --apply
+```
+
+Subsequent imports preserve existing show and track IDs and create a
+database backup before inserting new shows.
+
+### Run the first full scan
+
+Once metadata has been imported:
+
+```bash
+./bin/wefunk-scan
+```
+
+The full scan indexes the configured music library, matches WEFUNK
+playlist entries against local music, exports reports and playlists,
+and safely rebuilds the dashboard.
+
+Navidrome is optional. If `ND_URL`, `ND_USER`, and `ND_PASS` are all
+configured, the scan also synchronizes Navidrome play counts and
+attempts Navidrome-backed artist-image enrichment. If they are not
+configured, those steps are skipped automatically without prompting.
 
 ## Main Workflow
 
@@ -197,9 +254,9 @@ Once the required source data is available, run a full scan.
 ./bin/wefunk-scan
 ```
 
-The full scan runs the WEFUNK engine, synchronizes optional Navidrome
-play counts, attempts artist-image synchronization, and safely rebuilds
-the dashboard.
+The full scan runs the WEFUNK engine and safely rebuilds the dashboard.
+If Navidrome credentials are configured, it also synchronizes play
+counts and attempts Navidrome-backed artist-image enrichment.
 
 ### Incremental update
 
@@ -255,7 +312,10 @@ for a simple HTTP health check.
   ----------------------------------- -----------------------------------
   `./bin/wefunk-init`                 Validate a new installation and
                                       create runtime directories
-
+                                      
+  `./bin/wefunk-import`               Initialize/import WEFUNK playlist
+                                      metadata into the primary database
+  
   `./bin/wefunk-scan`                 Run a full WEFUNK/library scan and
                                       dashboard rebuild
 
@@ -462,16 +522,33 @@ version control.
 
 WEFUNK Dashboard expects playlist metadata in JSON format under:
 
-``` text
+```text
 $WEFUNK_DATA_DIR/json
 ```
 
-Playlist metadata can be collected using an external WEFUNK playlist
-scraper.
+Metadata filenames must use the form:
 
-The optional setting:
+```text
+wefunk_shows_<first-show>_<last-show>.json
+```
 
-``` text
+The importer accepts a JSON list of show objects, or an object
+containing a `shows` list. Playlist entries for each show are read from
+the `playlistbox` field.
+
+Before the first scan, initialize and import the metadata with:
+
+```bash
+./bin/wefunk-import
+./bin/wefunk-import --apply
+```
+
+The first command is a dry run. The second applies the reviewed import.
+
+Playlist metadata can also be collected using an external WEFUNK
+playlist scraper. The optional setting:
+
+```text
 WEFUNK_SCRAPER_SCRIPT
 ```
 
