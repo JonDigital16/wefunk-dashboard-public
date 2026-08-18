@@ -1,0 +1,67 @@
+#!/bin/zsh
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ROOT="${WEFUNK_PROJECT_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+
+# Load project-local configuration if present.
+# Existing exported environment variables take precedence.
+if [ -f "$ROOT/.env" ]; then
+  while IFS= read -r line || [ -n "$line" ]; do
+    [[ -z "$line" ]] && continue
+    [[ "$line" == \#* ]] && continue
+
+    key="${line%%=*}"
+    value="${line#*=}"
+
+    [[ "$key" == "$line" ]] && continue
+
+    if [[ -z "${(P)key+x}" ]]; then
+      export "$key=$value"
+    fi
+  done < "$ROOT/.env"
+fi
+
+VENV="${WEFUNK_VENV:-$ROOT/.venv}"
+PYTHON="${WEFUNK_PYTHON:-$VENV/bin/python}"
+
+DATA_ROOT="${WEFUNK_DATA_DIR:-$HOME/.local/share/wefunk}"
+DB_FILE="${WEFUNK_DB_FILE:-$DATA_ROOT/db/wefunk.db}"
+JSON_DIR="$DATA_ROOT/json"
+
+if [ ! -x "$PYTHON" ]; then
+  echo "❌ Python environment not found:"
+  echo "   $PYTHON"
+  exit 1
+fi
+
+if ! find "$JSON_DIR" -maxdepth 1 -type f -name 'wefunk_shows_*.json' \
+     -print -quit 2>/dev/null | grep -q .; then
+  echo "❌ No WEFUNK playlist metadata found."
+  echo
+  echo "Expected at least one file matching:"
+  echo "   $JSON_DIR/wefunk_shows_*.json"
+  exit 1
+fi
+
+if [ ! -f "$DB_FILE" ]; then
+  echo "🗄️ Initializing primary WEFUNK database..."
+  "$PYTHON" "$ROOT/engine/init_wefunk_database.py"
+  echo
+fi
+
+if [[ "$1" == "--apply" ]]; then
+  echo "📥 Importing WEFUNK metadata..."
+  "$PYTHON" "$ROOT/engine/import_wefunk_incremental.py" --db "$DB_FILE" --json-dir "$JSON_DIR" --apply
+else
+  echo "🔎 Reviewing WEFUNK metadata import..."
+  echo
+  "$PYTHON" "$ROOT/engine/import_wefunk_incremental.py" --db "$DB_FILE" --json-dir "$JSON_DIR"
+
+  echo
+  echo "Dry run complete."
+  echo
+  echo "If the report looks correct, apply it with:"
+  echo
+  echo "  ./bin/wefunk-import --apply"
+fi

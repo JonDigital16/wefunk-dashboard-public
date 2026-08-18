@@ -26,54 +26,44 @@ DASHBOARD_APP="$DASHBOARD_ROOT/wefunk-dashboard"
 VENV="${WEFUNK_VENV:-$DASHBOARD_ROOT/.venv}"
 PYTHON="${WEFUNK_PYTHON:-$VENV/bin/python}"
 ENGINE_SCRIPT="${WEFUNK_ENGINE_SCRIPT:-$DASHBOARD_ROOT/wefunk-engine/wefunk_engine.py}"
+DASHBOARD_SCRIPT="${WEFUNK_DASHBOARD_SCRIPT:-$DASHBOARD_ROOT/bin/wefunk-dashboard}"
 
-if [ -f "$HOME/.wefunk-env" ]; then
-  source "$HOME/.wefunk-env"
-fi
-
-if [ -f "$HOME/.config/wefunk/navidrome.env" ]; then
-  source "$HOME/.config/wefunk/navidrome.env"
-fi
-
-echo "🔍 WEFUNK full scan: engine + Navidrome sync + artist images + safe rebuild"
+echo "🔍 WEFUNK full scan: engine + optional Navidrome sync + safe rebuild"
 
 echo
-echo "1/4 Running WEFUNK engine..."
+echo "1/3 Running WEFUNK engine..."
 "$PYTHON" -u "$ENGINE_SCRIPT"
 
 echo
-echo "2/4 Syncing Navidrome play counts..."
+echo "2/3 Optional Navidrome enrichment..."
 
-if [ -z "$ND_URL" ]; then
-  read "ND_URL?Navidrome URL: "
-  export ND_URL
-fi
+if [ -n "${ND_URL:-}" ] && [ -n "${ND_USER:-}" ] && [ -n "${ND_PASS:-}" ]; then
 
-if [ -z "$ND_USER" ]; then
-  read "ND_USER?Navidrome username: "
-  export ND_USER
-fi
+  echo "✅ Navidrome configuration detected."
+  echo "   Syncing play counts..."
 
-if [ -z "$ND_PASS" ]; then
-  read -s "ND_PASS?Navidrome password: "
+  "$PYTHON" "$DASHBOARD_APP/export_navidrome_play_counts.py"
+
   echo
-  export ND_PASS
-fi
+  echo "   Downloading new artist images..."
 
-"$PYTHON" "$DASHBOARD_APP/export_navidrome_play_counts.py"
+  if "$PYTHON" "$DASHBOARD_APP/download_artist_images.py"; then
+    echo "✅ Artist image sync complete."
+  else
+    echo "⚠️ Artist image sync failed; continuing."
+  fi
 
-echo
-echo "3/4 Downloading new artist images..."
-
-if "$PYTHON" "$DASHBOARD_APP/download_artist_images.py"; then
-  echo "✅ Artist image sync complete."
 else
-  echo "⚠️ Artist image sync failed; continuing with dashboard rebuild."
+
+  echo "ℹ️ Navidrome is not configured."
+  echo "   Skipping play-count and Navidrome artist-image enrichment."
+  echo "   Set ND_URL, ND_USER, and ND_PASS in .env to enable it."
+
 fi
 
 echo
-echo "4/4 Rebuilding dashboard safely..."
-"$DASHBOARD_ROOT/bin/wefunk-dashboard"
+echo "3/3 Rebuilding dashboard safely..."
+"$DASHBOARD_SCRIPT"
 
 echo
 echo "✅ WEFUNK full scan complete."
