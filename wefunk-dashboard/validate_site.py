@@ -1,9 +1,6 @@
 #!/usr/bin/env python3
 
-import os
-from pathlib import Path
-
-SITE = Path(os.environ.get("WEFUNK_SITE_DIR", "/Users/jonathan/scripts/wefunk-dashboard/site"))
+from common import SITE
 
 required_files = [
     "index.html",

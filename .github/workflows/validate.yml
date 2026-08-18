@@ -1,0 +1,123 @@
+name: Validate
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate public source
+    runs-on: macos-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.14'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+
+      - name: Check Python syntax
+        run: |
+          FAILED=0
+
+          while IFS= read -r -d '' f; do
+            if ! python -m py_compile "$f"; then
+              echo "Python syntax failed: $f"
+              FAILED=1
+            fi
+          done < <(
+            find . \
+              -type f \
+              -name '*.py' \
+              -not -path './.git/*' \
+              -not -path './.venv/*' \
+              -not -path '*/__pycache__/*' \
+              -print0
+          )
+
+          exit "$FAILED"
+
+      - name: Check shell syntax
+        shell: zsh {0}
+        run: |
+          FAILED=0
+
+          while IFS= read -r -d '' f; do
+            head -1 "$f" | grep -qE '^#!.*(zsh|bash|sh)' || continue
+
+            if ! zsh -n "$f"; then
+              echo "Shell syntax failed: $f"
+              FAILED=1
+            fi
+          done < <(
+            find bin wefunk-dashboard \
+              -type f \
+              -print0
+          )
+
+          exit "$FAILED"
+
+      - name: Check for forbidden committed files
+        run: |
+          FORBIDDEN="$(
+            git ls-files |
+            grep -E '(^|/)(\.env|\.venv|site|site-next|site-backup-last-good|data|logs|reports|backups?)(/|$)|\.(db|sqlite|sqlite3|pem|key)$' \
+            || true
+          )"
+
+          if [ -n "$FORBIDDEN" ]; then
+            echo "Forbidden files are committed:"
+            echo "$FORBIDDEN"
+            exit 1
+          fi
+
+      - name: Check for personal environment references
+        run: |
+          USER_PATH="/""Users/"
+          VOLUME_PATH="/""Volumes/"
+          PRIVATE_DOMAIN="jonny""\.digital"
+          PRIVATE_USER="jon""digital"
+
+          PATTERN="${USER_PATH}[^/]+|${VOLUME_PATH}[^/]+|${PRIVATE_DOMAIN}|${PRIVATE_USER}|192\.168\.[0-9]+\.[0-9]+|100\.[0-9]+\.[0-9]+\.[0-9]+"
+
+          HITS="$(
+            git grep -n -I -E "$PATTERN" -- \
+            || true
+          )"
+
+          if [ -n "$HITS" ]; then
+            echo "Potential personal/environment references found:"
+            echo "$HITS"
+            exit 1
+          fi
+
+      - name: Verify required public files
+        run: |
+          REQUIRED=(
+            README.md
+            LICENSE
+            requirements.txt
+            .env.example
+            .gitignore
+          )
+
+          for file in "${REQUIRED[@]}"; do
+            if [ ! -f "$file" ]; then
+              echo "Missing required file: $file"
+              exit 1
+            fi
+          done

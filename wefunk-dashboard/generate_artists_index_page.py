@@ -9,16 +9,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from common import artist_slugify, esc
+from common import SITE, EXPORTS, artist_slugify, esc
 
-SITE = Path(
-    os.environ.get(
-        "WEFUNK_SITE_DIR",
-        "/Users/jonathan/scripts/wefunk-dashboard/site",
-    )
-)
-
-EXPORTS = Path("/Volumes/MEDIA/wefunk/exports")
 SOURCE = EXPORTS / "wefunk_owned_tracks_enriched.csv"
 TEMPLATE = SITE / "albums.html"
 OUT = SITE / "artists.html"
