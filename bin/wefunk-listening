@@ -1,0 +1,84 @@
+#!/bin/zsh
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ROOT="${WEFUNK_PROJECT_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+
+# Load project-local configuration if present.
+# Existing exported environment variables take precedence.
+if [ -f "$ROOT/.env" ]; then
+  while IFS= read -r line || [ -n "$line" ]; do
+    [[ -z "$line" ]] && continue
+    [[ "$line" == \#* ]] && continue
+
+    key="${line%%=*}"
+    value="${line#*=}"
+
+    [[ "$key" == "$line" ]] && continue
+
+    if [[ -z "${(P)key+x}" ]]; then
+      export "$key=$value"
+    fi
+  done < "$ROOT/.env"
+fi
+
+VENV="${WEFUNK_VENV:-$ROOT/.venv}"
+PYTHON="${WEFUNK_PYTHON:-$VENV/bin/python}"
+
+COLLECTOR="$ROOT/wefunk-dashboard/collect_listening_history.py"
+
+if [ ! -x "$PYTHON" ]; then
+  echo "❌ Python environment not found:"
+  echo "   $PYTHON"
+  exit 1
+fi
+
+if [ ! -f "$COLLECTOR" ]; then
+  echo "❌ Listening collector not found:"
+  echo "   $COLLECTOR"
+  exit 1
+fi
+
+COMMAND="${1:-status}"
+
+case "$COMMAND" in
+
+  init)
+    echo "🎧 Initializing WEFUNK listening history..."
+    "$PYTHON" "$COLLECTOR" --init
+    ;;
+
+  collect)
+    if [ -z "${ND_URL:-}" ] || \
+       [ -z "${ND_USER:-}" ] || \
+       [ -z "${ND_PASS:-}" ]; then
+      echo "❌ Navidrome is not configured."
+      echo
+      echo "Set ND_URL, ND_USER, and ND_PASS in:"
+      echo "   $ROOT/.env"
+      exit 1
+    fi
+
+    "$PYTHON" "$COLLECTOR"
+    ;;
+
+  status)
+    "$PYTHON" "$COLLECTOR" --status
+    ;;
+
+  *)
+    echo "WEFUNK Listening"
+    echo
+    echo "Usage:"
+    echo "  ./bin/wefunk-listening init"
+    echo "  ./bin/wefunk-listening collect"
+    echo "  ./bin/wefunk-listening status"
+    echo
+    echo "Commands:"
+    echo "  init      Create listening-history tables"
+    echo "  collect   Process the current Navidrome track"
+    echo "  status    Show listening-history statistics"
+    exit 1
+    ;;
+
+esac
