@@ -67,6 +67,10 @@
 
 <img width="2494" height="1138" alt="Screenshot 2026-08-17 at 3 18 04 PM" src="https://github.com/user-attachments/assets/3cac27cf-7dd1-4a28-b8b7-ab63dc8e266c" />
 
+### Listening History
+
+<img width="1519" height="1179" alt="image" src="https://github.com/user-attachments/assets/d761ab25-c976-400b-8c5f-b0013219df23" />
+
 ## How It Works
 
 ``` text
