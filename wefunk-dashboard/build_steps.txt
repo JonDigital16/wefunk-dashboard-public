@@ -28,6 +28,7 @@ enhance_album_cards.py
 enhance_show_pages_episode_art.py
 enhance_artist_pages_discography.py
 export_now_playing.py
+generate_listening_page.py
 generate_homepage_reports.py
 enhance_homepage_now_playing.py
 enhance_homepage_collection_stats.py

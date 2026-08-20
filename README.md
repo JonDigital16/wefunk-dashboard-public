@@ -258,6 +258,33 @@ The full scan runs the WEFUNK engine and safely rebuilds the dashboard.
 If Navidrome credentials are configured, it also synchronizes play
 counts and attempts Navidrome-backed artist-image enrichment.
 
+### WEFUNK Listening History
+
+WEFUNK Dashboard can optionally maintain a personal listening history
+containing only tracks that also appear in the WEFUNK tracklist database.
+
+This feature is independent of Last.fm. Playback information is read from
+Navidrome using the existing `ND_URL`, `ND_USER`, and `ND_PASS` configuration.
+
+Initialize listening history once with `./bin/wefunk-listening init`.
+
+Inspect its current status with `./bin/wefunk-listening status`.
+
+Process the currently playing Navidrome track with
+`./bin/wefunk-listening collect`.
+
+The collector records a qualifying play only after enough of the track has
+been heard and protects against duplicate entries while the same playback
+remains active. Tracks that do not appear in the WEFUNK database are ignored.
+
+`collect` is designed to be run periodically by a scheduler such as launchd,
+cron, or systemd. Listening History remains optional; users who do not
+configure Navidrome can continue using the rest of WEFUNK Dashboard normally.
+
+The generated `/listening.html` page includes recent WEFUNK-matched plays,
+time-range filtering, listening activity, top artists, top albums, top tracks,
+listening time, and links back into WEFUNK artist, album, and episode pages.
+
 ### Incremental update
 
 After the initial library index exists:
@@ -349,6 +376,9 @@ for a simple HTTP health check.
 
   `./bin/wefunk-nowplaying`           Export current Navidrome
                                       now-playing data
+
+  `./bin/wefunk-listening`            Initialize, collect, or inspect
+                                      WEFUNK-only listening history
 
   `./bin/wefunk-nowplaying-status`    Inspect now-playing state on macOS
 
