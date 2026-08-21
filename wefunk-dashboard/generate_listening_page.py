@@ -20,6 +20,10 @@ from collect_listening_history import ensure_schema
 
 
 RANGES = {
+    "today": {
+        "label": "Today",
+        "seconds": None,
+    },
     "7d": {
         "label": "7 Days",
         "seconds": 7 * 24 * 60 * 60,
@@ -371,7 +375,7 @@ def load_activity(connection, range_key, since=None):
 
         dt = datetime.fromtimestamp(played_at)
 
-        if range_key in {"7d", "30d", "90d"}:
+        if range_key in {"today", "7d", "30d", "90d"}:
             bucket = dt.strftime("%Y-%m-%d")
 
         elif range_key == "1y":
@@ -397,8 +401,9 @@ def load_activity(connection, range_key, since=None):
 
     now = datetime.now()
 
-    if range_key in {"7d", "30d", "90d"}:
+    if range_key in {"today", "7d", "30d", "90d"}:
         days = {
+            "today": 1,
             "7d": 7,
             "30d": 30,
             "90d": 90,
@@ -828,11 +833,23 @@ def main():
         for range_key, config in RANGES.items():
             seconds = config["seconds"]
 
-            since = (
-                now - seconds
-                if seconds is not None
-                else None
-            )
+            if range_key == "today":
+                since = int(
+                    datetime.now()
+                    .replace(
+                        hour=0,
+                        minute=0,
+                        second=0,
+                        microsecond=0,
+                    )
+                    .timestamp()
+                )
+            else:
+                since = (
+                    now - seconds
+                    if seconds is not None
+                    else None
+                )
 
             summary = load_summary(
                 connection,
@@ -1539,6 +1556,7 @@ a:hover {{
     class="listening-range-tabs"
     aria-label="Listening time range"
   >
+    <button data-range="today">Today</button>
     <button data-range="7d">7 Days</button>
     <button data-range="30d">30 Days</button>
     <button data-range="90d">90 Days</button>

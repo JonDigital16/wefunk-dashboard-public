@@ -6,6 +6,8 @@ import json
 import os
 import re
 import sqlite3
+import subprocess
+import sys
 import time
 from pathlib import Path
 
@@ -509,6 +511,48 @@ def process_song(connection, song, dry_run=False):
         f"RECORDED  {artist} — {track} "
         f"| {len(matches)} WEFUNK occurrence(s)"
     )
+
+    if cursor.rowcount:
+        refresh_listening_page()
+
+
+def refresh_listening_page():
+    """
+    Rebuild the Listening page after a newly qualified play is recorded.
+    """
+    dashboard_dir = Path(__file__).resolve().parent
+
+    generator = dashboard_dir / "generate_listening_page.py"
+    global_ui = dashboard_dir / "enhance_global_ui.py"
+
+    try:
+        subprocess.run(
+            [
+                sys.executable,
+                str(generator),
+            ],
+            cwd=dashboard_dir,
+            check=True,
+        )
+
+        subprocess.run(
+            [
+                sys.executable,
+                str(global_ui),
+            ],
+            cwd=dashboard_dir,
+            check=True,
+        )
+
+        print("REFRESH   listening.html updated")
+
+    except subprocess.CalledProcessError as exc:
+        # The listening play is already safely stored.
+        # A page-generation problem should not lose listening history.
+        print(
+            "WARNING  Listening page refresh failed "
+            f"(exit {exc.returncode})"
+        )
 
 
 def print_status(connection):

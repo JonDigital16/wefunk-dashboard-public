@@ -4,7 +4,7 @@ import re
 import os
 from pathlib import Path
 
-from mutagen.id3 import COMM, ID3, ID3NoHeaderError, TRCK
+from mutagen.id3 import COMM, ID3, ID3NoHeaderError, TPOS, TRCK
 
 EPISODE_DIR = Path(os.environ.get("WEFUNK_EPISODE_DIR", Path(os.environ.get("WEFUNK_MUSIC_DIR", Path.home() / "Music")) / "wefunkradio mixes")).expanduser().resolve()
 
@@ -76,7 +76,16 @@ for show_id, path in pending:
         tags.add(
             TRCK(
                 encoding=3,
-                text=[f"{show_id}/{highest_show}"],
+                text=[f"{show_id}/{show_id}"],
+            )
+        )
+
+        # Disc number: always 1/1.
+        tags.delall("TPOS")
+        tags.add(
+            TPOS(
+                encoding=3,
+                text=["1/1"],
             )
         )
 
@@ -84,7 +93,7 @@ for show_id, path in pending:
 
         print(
             f"{show_id} - comment cleared, "
-            f"track set to {show_id}/{highest_show}"
+            f"track set to {show_id}/{show_id}, disc set to 1/1"
         )
 
         updated += 1
