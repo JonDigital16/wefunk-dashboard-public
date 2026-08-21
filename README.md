@@ -69,7 +69,7 @@
 
 ### Listening History
 
-<img width="1519" height="1179" alt="image" src="https://github.com/user-attachments/assets/d761ab25-c976-400b-8c5f-b0013219df23" />
+<img width="1518" height="1148" alt="image" src="https://github.com/user-attachments/assets/8361e7f8-211a-4f28-9d53-eaf84b85b432" />
 
 ## How It Works
 
