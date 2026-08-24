@@ -223,8 +223,8 @@ def required_seconds(duration):
     return max(
         30,
         min(
-            int(duration * 0.50),
-            240,
+            int(duration * 0.40),
+            120,
         ),
     )
 
