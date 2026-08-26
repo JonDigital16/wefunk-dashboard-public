@@ -212,21 +212,7 @@ def find_wefunk_tracks(connection, artist_norm, track_norm):
 
 
 def required_seconds(duration):
-    try:
-        duration = int(duration or 0)
-    except (TypeError, ValueError):
-        duration = 0
-
-    if duration <= 0:
-        return 30
-
-    return max(
-        30,
-        min(
-            int(duration * 0.40),
-            120,
-        ),
-    )
+    return 30
 
 
 def build_fingerprint(song):
