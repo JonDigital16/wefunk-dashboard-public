@@ -289,6 +289,54 @@ The generated `/listening.html` page includes recent WEFUNK-matched plays,
 time-range filtering, listening activity, top artists, top albums, top tracks,
 listening time, and links back into WEFUNK artist, album, and episode pages.
 
+### Navidrome Playlists
+
+WEFUNK Dashboard can generate `.m3u` playlists from tracks in your local
+music library that have been matched against the WEFUNK database.
+
+Preview the playlists without writing anything:
+
+``` bash
+python3 wefunk-dashboard/generate_navidrome_playlists.py
+```
+
+Write the current canonical playlists:
+
+``` bash
+python3 wefunk-dashboard/generate_navidrome_playlists.py --apply
+```
+
+By default, playlists are written to:
+
+``` text
+$WEFUNK_MUSIC_DIR/playlists/wefunk
+```
+
+The generated playlist paths use `/music` as the music-library path visible
+inside Navidrome. Override that if your Navidrome MusicFolder uses a different
+path:
+
+``` bash
+python3 wefunk-dashboard/generate_navidrome_playlists.py --navidrome-root /music --apply
+```
+
+Playlist state is stored in:
+
+``` text
+$WEFUNK_DATA_DIR/state/navidrome-playlists.json
+```
+
+Use `--expand` together with `--apply` to add newly qualifying Genre, Artist,
+and Episode Range playlists to the canonical playlist manifest:
+
+``` bash
+python3 wefunk-dashboard/generate_navidrome_playlists.py --expand --apply
+```
+
+This feature does not require Navidrome API credentials. It operates directly
+on the WEFUNK database and local music library and writes playlist files that
+Navidrome can discover from the configured music folder.
+
 ### Incremental update
 
 After the initial library index exists:
@@ -482,7 +530,12 @@ ND_USER
 ND_PASS
 ```
 
-Navidrome is used by play-count and now-playing features.
+Navidrome is used by play-count, now-playing, and Listening History features.
+
+The Navidrome playlist generator does not use these API credentials. It writes
+`.m3u` files directly beneath the configured music library. Its default
+Navidrome-visible music path is `/music`; use `--navidrome-root` when your
+Navidrome MusicFolder uses a different path.
 
 ### Advanced overrides
 
