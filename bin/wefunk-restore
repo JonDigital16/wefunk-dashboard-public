@@ -1,0 +1,720 @@
+#!/bin/zsh
+
+set -u
+set -o pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT="${WEFUNK_PROJECT_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+
+DATA_ROOT="${WEFUNK_DATA_DIR:-$HOME/.local/share/wefunk}"
+DB="${WEFUNK_DB_FILE:-$DATA_ROOT/db/wefunk.db}"
+STATE_DIR="${WEFUNK_STATE_DIR:-$DATA_ROOT/state}"
+RECOVERY_ROOT="${WEFUNK_RECOVERY_DIR:-$DATA_ROOT/recovery}"
+
+SNAPSHOT_SCRIPT="$PROJECT/bin/wefunk-snapshot"
+
+PORT="${WEFUNK_PORT:-8099}"
+LOCAL_URL="http://127.0.0.1:$PORT/"
+
+DOMAIN="gui/$(id -u)"
+
+DASHBOARD_LABEL="${WEFUNK_DASHBOARD_LABEL:-org.wefunk.dashboard}"
+DASHBOARD_PLIST="${WEFUNK_DASHBOARD_PLIST:-$HOME/Library/LaunchAgents/$DASHBOARD_LABEL.plist}"
+
+NOW_PLAYING_LABEL="${WEFUNK_NOWPLAYING_LABEL:-org.wefunk.dashboard.nowplaying}"
+NOW_PLAYING_PLIST="${WEFUNK_NOWPLAYING_PLIST:-$HOME/Library/LaunchAgents/$NOW_PLAYING_LABEL.plist}"
+
+DASHBOARD_WAS_LOADED=0
+NOW_PLAYING_WAS_LOADED=0
+DASHBOARD_WAS_PAUSED=0
+NOW_PLAYING_WAS_PAUSED=0
+SERVICES_PAUSED=0
+
+green() {
+    printf "\033[32m%s\033[0m\n" "$1"
+}
+
+yellow() {
+    printf "\033[33m%s\033[0m\n" "$1"
+}
+
+red() {
+    printf "\033[31m%s\033[0m\n" "$1"
+}
+
+heading() {
+    echo
+    printf "\033[1m%s\033[0m\n" "$1"
+    echo "--------------------------------------------------"
+}
+
+usage() {
+    cat <<'EOF'
+
+WEFUNK Recovery Restore
+
+Usage:
+  ./bin/wefunk-restore <snapshot-id> database
+  ./bin/wefunk-restore <snapshot-id> state
+  ./bin/wefunk-restore <snapshot-id> code
+
+Dry run:
+  ./bin/wefunk-restore --dry-run <snapshot-id> database
+  ./bin/wefunk-restore --dry-run <snapshot-id> state
+  ./bin/wefunk-restore --dry-run <snapshot-id> code
+
+Examples:
+  ./bin/wefunk-restore 20260901-075913 database
+  ./bin/wefunk-restore 20260901-075913 state
+  ./bin/wefunk-restore 20260901-075913 code
+
+Safety:
+  - --dry-run performs validation and planning only.
+  - Target snapshot is verified before restore.
+  - A fresh pre-restore recovery snapshot is created automatically.
+  - Configured macOS LaunchAgents are paused when available.
+  - Database restoration uses a verified temporary SQLite copy.
+  - Database WAL/SHM files are preserved rather than deleted.
+  - Managed services that were loaded before restore are loaded again afterward.
+  - Code restore does not delete files that were added after the snapshot.
+  - Recovery-toolkit scripts are preserved during code restore.
+
+EOF
+}
+
+has_launchctl() {
+    command -v launchctl >/dev/null 2>&1
+}
+
+is_loaded() {
+    local label="$1"
+
+    has_launchctl || return 1
+    [[ -n "$label" ]] || return 1
+
+    launchctl print "$DOMAIN/$label" >/dev/null 2>&1
+}
+
+can_manage_service() {
+    local label="$1"
+    local plist="$2"
+
+    has_launchctl || return 1
+    [[ -n "$label" ]] || return 1
+    [[ -f "$plist" ]] || return 1
+
+    return 0
+}
+
+pause_services() {
+    heading "Pausing WEFUNK Services"
+
+    if ! has_launchctl; then
+        yellow "launchctl is not available; skipping LaunchAgent coordination."
+        return 0
+    fi
+
+    if is_loaded "$DASHBOARD_LABEL"; then
+        if ! can_manage_service "$DASHBOARD_LABEL" "$DASHBOARD_PLIST"; then
+            red "Dashboard service is loaded but its LaunchAgent plist is unavailable:"
+            echo "  $DASHBOARD_PLIST"
+            red "Restore stopped before changing live files."
+            return 1
+        fi
+
+        DASHBOARD_WAS_LOADED=1
+
+        launchctl bootout \
+            "$DOMAIN" \
+            "$DASHBOARD_PLIST" \
+            >/dev/null 2>&1
+
+        if [[ $? -eq 0 ]]; then
+            DASHBOARD_WAS_PAUSED=1
+            SERVICES_PAUSED=1
+            green "Dashboard service paused"
+        else
+            red "Could not pause dashboard service"
+            return 1
+        fi
+    else
+        yellow "Dashboard service was not loaded"
+    fi
+
+    if is_loaded "$NOW_PLAYING_LABEL"; then
+        if ! can_manage_service "$NOW_PLAYING_LABEL" "$NOW_PLAYING_PLIST"; then
+            red "Now-playing service is loaded but its LaunchAgent plist is unavailable:"
+            echo "  $NOW_PLAYING_PLIST"
+            red "Restore stopped before changing live files."
+            return 1
+        fi
+
+        NOW_PLAYING_WAS_LOADED=1
+
+        launchctl bootout \
+            "$DOMAIN" \
+            "$NOW_PLAYING_PLIST" \
+            >/dev/null 2>&1
+
+        if [[ $? -eq 0 ]]; then
+            NOW_PLAYING_WAS_PAUSED=1
+            SERVICES_PAUSED=1
+            green "Now-playing/listening-history job paused"
+        else
+            red "Could not pause now-playing/listening-history job"
+            return 1
+        fi
+    else
+        yellow "Now-playing/listening-history job was not loaded"
+    fi
+
+    sleep 1
+
+    return 0
+}
+
+resume_services() {
+    local failures=0
+
+    if [[ $SERVICES_PAUSED -ne 1 ]]; then
+        return 0
+    fi
+
+    heading "Restoring Service State"
+
+    if [[ $DASHBOARD_WAS_PAUSED -eq 1 ]]; then
+        launchctl bootstrap \
+            "$DOMAIN" \
+            "$DASHBOARD_PLIST" \
+            >/dev/null 2>&1
+
+        if [[ $? -eq 0 ]]; then
+            green "Dashboard service loaded"
+        else
+            red "Could not reload dashboard service"
+            failures=1
+        fi
+    fi
+
+    if [[ $NOW_PLAYING_WAS_PAUSED -eq 1 ]]; then
+        launchctl bootstrap \
+            "$DOMAIN" \
+            "$NOW_PLAYING_PLIST" \
+            >/dev/null 2>&1
+
+        if [[ $? -eq 0 ]]; then
+            green "Now-playing/listening-history job loaded"
+        else
+            red "Could not reload now-playing/listening-history job"
+            failures=1
+        fi
+    fi
+
+    SERVICES_PAUSED=0
+    return $failures
+}
+
+wait_for_dashboard() {
+    local attempts=30
+    local attempt=1
+    local http_code=""
+
+    if [[ $DASHBOARD_WAS_PAUSED -ne 1 ]]; then
+        return 0
+    fi
+
+    heading "Waiting for Dashboard"
+
+    if ! command -v curl >/dev/null 2>&1; then
+        yellow "curl is unavailable; skipping dashboard HTTP readiness check."
+        return 0
+    fi
+
+    while [[ $attempt -le $attempts ]]; do
+        http_code="$(
+            curl                 --silent                 --output /dev/null                 --write-out '%{http_code}'                 --max-time 2                 "$LOCAL_URL"                 2>/dev/null
+        )"
+
+        if [[ "$http_code" == "200" ]]; then
+            green "Dashboard is ready (HTTP 200)"
+            return 0
+        fi
+
+        sleep 1
+        (( attempt++ ))
+    done
+
+    red "Dashboard did not become ready within 30 seconds."
+    red "Run: ./bin/wefunk-dashboard-health"
+    red "Run: wefunk errors"
+    return 1
+}
+
+verify_snapshot() {
+    SNAPSHOT="$1"
+
+    heading "Verifying Target Snapshot"
+
+    if [[ ! -d "$SNAPSHOT" ]]; then
+        red "Snapshot directory does not exist:"
+        echo "  $SNAPSHOT"
+        return 1
+    fi
+
+    if [[ ! -f "$SNAPSHOT/manifest.txt" ]]; then
+        red "Snapshot manifest is missing."
+        return 1
+    fi
+
+    SNAPSHOT_DB="$SNAPSHOT/database/wefunk.db"
+    CHECKSUM="$SNAPSHOT/database/wefunk.db.sha256"
+
+    if [[ ! -f "$SNAPSHOT_DB" || ! -f "$CHECKSUM" ]]; then
+        red "Snapshot database or checksum is missing."
+        return 1
+    fi
+
+    (
+        cd "$SNAPSHOT/database" || exit 1
+        shasum -a 256 -c wefunk.db.sha256
+    )
+
+    if [[ $? -ne 0 ]]; then
+        red "Snapshot checksum failed."
+        return 1
+    fi
+
+    DB_CHECK="$(
+        sqlite3 "$SNAPSHOT_DB" \
+            'PRAGMA quick_check;' \
+            2>&1
+    )"
+
+    if [[ "$DB_CHECK" != "ok" ]]; then
+        red "Snapshot database integrity check failed."
+        echo "$DB_CHECK"
+        return 1
+    fi
+
+    green "Target recovery snapshot is valid"
+}
+
+restore_database() {
+    SNAPSHOT="$1"
+    SNAPSHOT_ID="$2"
+
+    SNAPSHOT_DB="$SNAPSHOT/database/wefunk.db"
+    DB_DIR="$(dirname "$DB")"
+
+    RESTORE_TEMP="$DB_DIR/.wefunk-restore-$SNAPSHOT_ID-$$.db"
+    ORIGINAL_DB="$DB_DIR/wefunk.db.before-restore-$(date '+%Y%m%d-%H%M%S')"
+
+    heading "Restoring Database"
+
+    heading "Checking SQLite Handles"
+
+    if ! command -v lsof >/dev/null 2>&1; then
+        red "lsof is required to verify that the live SQLite database is not writable."
+        red "Database restore stopped before changing live files."
+        return 1
+    fi
+
+    WRITABLE_HANDLE_FOUND=0
+    READER_FOUND=0
+
+    for SQLITE_FILE in \
+        "$DB" \
+        "$DB-wal" \
+        "$DB-shm"
+    do
+        [[ -e "$SQLITE_FILE" ]] || continue
+
+        HANDLE_OUTPUT="$(
+            lsof -nP "$SQLITE_FILE" 2>/dev/null
+        )"
+
+        [[ -n "$HANDLE_OUTPUT" ]] || continue
+
+        WRITABLE_OUTPUT="$(
+            printf '%s\n' "$HANDLE_OUTPUT" \
+                | awk 'NR == 1 || $4 ~ /[wu]$/'
+        )"
+
+        READ_ONLY_OUTPUT="$(
+            printf '%s\n' "$HANDLE_OUTPUT" \
+                | awk 'NR == 1 || $4 ~ /r$/'
+        )"
+
+        if printf '%s\n' "$HANDLE_OUTPUT" \
+            | awk 'NR > 1 && $4 ~ /[wu]$/ { found=1 } END { exit !found }'
+        then
+            red "Writable SQLite handle detected:"
+            echo
+            printf '%s\n' "$WRITABLE_OUTPUT"
+            echo
+            WRITABLE_HANDLE_FOUND=1
+        fi
+
+        if printf '%s\n' "$HANDLE_OUTPUT" \
+            | awk 'NR > 1 && $4 ~ /r$/ { found=1 } END { exit !found }'
+        then
+            if [[ $READER_FOUND -eq 0 ]]; then
+                yellow "Read-only SQLite handles detected and allowed:"
+                echo
+                READER_FOUND=1
+            fi
+
+            printf '%s\n' "$READ_ONLY_OUTPUT"
+            echo
+        fi
+    done
+
+    if [[ $WRITABLE_HANDLE_FOUND -eq 1 ]]; then
+        red "Database restore aborted."
+        red "Close the writable process and try again."
+        return 1
+    fi
+
+    if [[ $READER_FOUND -eq 0 ]]; then
+        green "No open SQLite handles detected"
+    else
+        green "No writable SQLite handles detected"
+    fi
+
+    sqlite3 "$SNAPSHOT_DB" \
+        ".backup '$RESTORE_TEMP'"
+
+    if [[ $? -ne 0 ]]; then
+        red "Could not create verified restore database."
+        return 1
+    fi
+
+    TEMP_CHECK="$(
+        sqlite3 "$RESTORE_TEMP" \
+            'PRAGMA quick_check;' \
+            2>&1
+    )"
+
+    if [[ "$TEMP_CHECK" != "ok" ]]; then
+        red "Temporary restore database failed integrity check."
+        echo "$TEMP_CHECK"
+        return 1
+    fi
+
+    cp -p "$DB" "$ORIGINAL_DB"
+
+    if [[ $? -ne 0 ]]; then
+        red "Could not preserve current live database."
+        return 1
+    fi
+
+    if [[ -f "$DB-wal" ]]; then
+        mv \
+            "$DB-wal" \
+            "$ORIGINAL_DB-wal"
+    fi
+
+    if [[ -f "$DB-shm" ]]; then
+        mv \
+            "$DB-shm" \
+            "$ORIGINAL_DB-shm"
+    fi
+
+    mv "$RESTORE_TEMP" "$DB"
+
+    if [[ $? -ne 0 ]]; then
+        red "Could not install restored database."
+        return 1
+    fi
+
+    LIVE_CHECK="$(
+        sqlite3 "$DB" \
+            'PRAGMA quick_check;' \
+            2>&1
+    )"
+
+    if [[ "$LIVE_CHECK" != "ok" ]]; then
+        red "Restored live database failed integrity check."
+        echo "$LIVE_CHECK"
+        echo
+        red "Services will remain paused."
+        SERVICES_PAUSED=0
+        return 1
+    fi
+
+    green "Database restored successfully"
+    green "Restored database quick_check: ok"
+
+    echo
+    echo "Previous live database preserved as:"
+    echo "  $ORIGINAL_DB"
+}
+
+restore_state() {
+    SNAPSHOT="$1"
+
+    heading "Restoring WEFUNK State"
+
+    if [[ ! -d "$SNAPSHOT/state" ]]; then
+        red "Snapshot state directory is missing."
+        return 1
+    fi
+
+    mkdir -p "$STATE_DIR" || return 1
+
+    rsync -a \
+        "$SNAPSHOT/state/" \
+        "$STATE_DIR/"
+
+    if [[ $? -ne 0 ]]; then
+        red "State restore failed."
+        return 1
+    fi
+
+    green "WEFUNK state restored successfully"
+}
+
+restore_code() {
+    SNAPSHOT="$1"
+
+    heading "Restoring Project Code"
+
+    if [[ ! -d "$SNAPSHOT/code" ]]; then
+        red "Snapshot code directory is missing."
+        return 1
+    fi
+
+    rsync -a \
+        --exclude '.git/' \
+        --exclude '.venv/' \
+        --exclude 'backups/' \
+        --exclude 'backup/' \
+        --exclude 'site/' \
+        --exclude 'site-next/' \
+        --exclude 'site-backup-last-good/' \
+        --exclude 'output-v2/' \
+        --exclude 'logs/' \
+        --exclude 'bin/wefunk-snapshot' \
+        --exclude 'bin/wefunk-restore' \
+        --exclude 'bin/wefunk-rollback' \
+        "$SNAPSHOT/code/" \
+        "$PROJECT/"
+
+    if [[ $? -ne 0 ]]; then
+        red "Code restore failed."
+        return 1
+    fi
+
+    green "Project code restored successfully"
+
+    echo
+    yellow "Files added after the snapshot were not deleted."
+    yellow "Recovery toolkit scripts were intentionally preserved."
+}
+
+DRY_RUN=0
+
+if [[ "${1:-}" == "--dry-run" ]]; then
+    DRY_RUN=1
+    shift
+fi
+
+if [[ $# -lt 2 ]]; then
+    usage
+    exit 1
+fi
+
+SNAPSHOT_ID="$1"
+COMPONENT="$2"
+
+case "$SNAPSHOT_ID" in
+    *[!0-9-]*|'')
+        red "Invalid snapshot ID:"
+        echo "  $SNAPSHOT_ID"
+        exit 1
+        ;;
+esac
+
+case "$COMPONENT" in
+    database|state|code)
+        ;;
+    *)
+        red "Unknown restore component:"
+        echo "  $COMPONENT"
+        usage
+        exit 1
+        ;;
+esac
+
+SNAPSHOT="$RECOVERY_ROOT/$SNAPSHOT_ID"
+
+heading "WEFUNK Recovery Restore"
+
+echo "Snapshot:  $SNAPSHOT_ID"
+echo "Component: $COMPONENT"
+echo
+
+verify_snapshot "$SNAPSHOT" || exit 1
+
+if [[ $DRY_RUN -eq 1 ]]; then
+    heading "Dry Run Restore Plan"
+
+    green "No live files will be changed"
+    green "No recovery snapshot will be created"
+    green "No services will be stopped"
+
+    echo
+    echo "Target snapshot:"
+    echo "  $SNAPSHOT_ID"
+
+    echo
+    echo "Component:"
+    echo "  $COMPONENT"
+
+    echo
+    echo "Service coordination:"
+
+    if ! has_launchctl; then
+        echo "  - launchctl unavailable; no LaunchAgents would be managed"
+    else
+        if is_loaded "$DASHBOARD_LABEL"; then
+            if can_manage_service "$DASHBOARD_LABEL" "$DASHBOARD_PLIST"; then
+                echo "  - $DASHBOARD_LABEL (would be paused)"
+            else
+                echo "  - $DASHBOARD_LABEL (loaded, but plist unavailable — restore would stop)"
+            fi
+        else
+            echo "  - $DASHBOARD_LABEL (not currently loaded)"
+        fi
+
+        if is_loaded "$NOW_PLAYING_LABEL"; then
+            if can_manage_service "$NOW_PLAYING_LABEL" "$NOW_PLAYING_PLIST"; then
+                echo "  - $NOW_PLAYING_LABEL (would be paused)"
+            else
+                echo "  - $NOW_PLAYING_LABEL (loaded, but plist unavailable — restore would stop)"
+            fi
+        else
+            echo "  - $NOW_PLAYING_LABEL (not currently loaded)"
+        fi
+    fi
+
+    echo
+    echo "Restore action:"
+
+    case "$COMPONENT" in
+        database)
+            echo "  - Verify snapshot database checksum"
+            echo "  - Verify snapshot SQLite integrity"
+            echo "  - Create automatic pre-restore snapshot"
+            echo "  - Pause WEFUNK services"
+            echo "  - Confirm live database has no writable SQLite handles"
+            echo "  - Preserve current live database"
+            echo "  - Restore snapshot database"
+            echo "  - Run SQLite quick_check"
+            echo "  - Restore prior service state"
+            ;;
+        state)
+            echo "  - Create automatic pre-restore snapshot"
+            echo "  - Pause WEFUNK services"
+            echo "  - Overlay snapshot state files"
+            echo "  - Restore prior service state"
+            ;;
+        code)
+            echo "  - Create automatic pre-restore snapshot"
+            echo "  - Pause WEFUNK services"
+            echo "  - Overlay snapshot project code"
+            echo "  - Preserve .git, .venv, generated data, and recovery tools"
+            echo "  - Restore prior service state"
+            ;;
+    esac
+
+    heading "Dry Run Complete"
+    green "Restore plan validated successfully"
+
+    exit 0
+fi
+
+heading "Confirmation"
+
+yellow "This will change live WEFUNK data."
+
+echo
+echo "Snapshot:"
+echo "  $SNAPSHOT_ID"
+echo
+echo "Component:"
+echo "  $COMPONENT"
+echo
+
+printf "Type RESTORE to continue: "
+read -r CONFIRMATION
+
+if [[ "$CONFIRMATION" != "RESTORE" ]]; then
+    yellow "Restore cancelled."
+    exit 0
+fi
+
+heading "Creating Automatic Pre-Restore Snapshot"
+
+if [[ ! -x "$SNAPSHOT_SCRIPT" ]]; then
+    red "Snapshot tool is missing:"
+    echo "  $SNAPSHOT_SCRIPT"
+    exit 1
+fi
+
+"$SNAPSHOT_SCRIPT" \
+    "Automatic pre-restore snapshot before $SNAPSHOT_ID ($COMPONENT)"
+
+if [[ $? -ne 0 ]]; then
+    red "Pre-restore snapshot failed."
+    red "No live files were changed."
+    exit 1
+fi
+
+trap resume_services EXIT INT TERM
+
+pause_services || exit 1
+
+case "$COMPONENT" in
+    database)
+        restore_database \
+            "$SNAPSHOT" \
+            "$SNAPSHOT_ID" \
+            || exit 1
+        ;;
+
+    state)
+        restore_state \
+            "$SNAPSHOT" \
+            || exit 1
+        ;;
+
+    code)
+        restore_code \
+            "$SNAPSHOT" \
+            || exit 1
+        ;;
+esac
+
+if ! resume_services; then
+    trap - EXIT INT TERM
+    red "Restore completed, but one or more WEFUNK services could not be restarted."
+    red "Run: ./bin/wefunk-dashboard-health"
+    exit 1
+fi
+
+if ! wait_for_dashboard; then
+    trap - EXIT INT TERM
+    red "Restore completed, but dashboard readiness verification failed."
+    exit 1
+fi
+
+trap - EXIT INT TERM
+
+heading "Restore Complete"
+
+green "WEFUNK restore completed successfully"
+
+echo
+echo "Recommended checks:"
+echo "  ./bin/wefunk-dashboard-health"

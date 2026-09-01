@@ -434,9 +434,93 @@ for a simple HTTP health check.
 
   `./bin/wefunk-nowplaying-status`    Inspect now-playing state on macOS
 
+  `./bin/wefunk-snapshot`             Create a recovery snapshot of code,
+                                      database, and operational state
+
+  `./bin/wefunk-restore`              Restore an individual recovery
+                                      snapshot component
+
+  `./bin/wefunk-rollback`             Roll back code, database, and state
+                                      together from a recovery snapshot
+
   `./bin/wefunk-weekly`               Run the optional download, artwork,
                                       and update workflow
   -----------------------------------------------------------------------
+
+## Recovery Toolkit
+
+WEFUNK Dashboard includes a recovery toolkit for creating independent,
+timestamped snapshots of the project source, SQLite database, and runtime state.
+
+Recovery snapshots are stored by default under:
+
+``` text
+$WEFUNK_DATA_DIR/recovery
+```
+
+Create a snapshot:
+
+``` bash
+./bin/wefunk-snapshot
+```
+
+Optionally include a description:
+
+``` bash
+./bin/wefunk-snapshot "Before dashboard upgrade"
+```
+
+Each snapshot contains the project source and configuration, an
+SQLite-consistent copy of `wefunk.db`, WEFUNK operational state files,
+and optional configured system files.
+
+Generated dashboard output, virtual environments, logs, backups, Git
+metadata, and other disposable data are excluded.
+
+### Restore one component
+
+Review a restore first:
+
+``` bash
+./bin/wefunk-restore --dry-run <snapshot-id> database
+```
+
+Then perform it:
+
+``` bash
+./bin/wefunk-restore <snapshot-id> database
+```
+
+Valid components are `database`, `state`, and `code`.
+
+A live restore automatically creates a fresh pre-restore snapshot.
+Database restores verify checksums and SQLite integrity, block writable
+SQLite handles, preserve the current database, and run `PRAGMA quick_check`
+after restoration.
+
+### Full rollback
+
+Review the complete rollback plan:
+
+``` bash
+./bin/wefunk-rollback --dry-run <snapshot-id>
+```
+
+Then restore code, database, and state together:
+
+``` bash
+./bin/wefunk-rollback <snapshot-id>
+```
+
+A full rollback creates an automatic pre-rollback snapshot before making
+changes. When configured macOS LaunchAgents are available, the toolkit
+coordinates service shutdown and restart around recovery.
+
+Files created after the target snapshot are not deleted, and the recovery
+toolkit scripts are preserved during code restoration.
+
+Recovery paths and service settings can be customized using the variables
+documented in `.env.example`.
 
 ## Configuration
 
