@@ -71,6 +71,11 @@
 
 <img width="1518" height="1148" alt="image" src="https://github.com/user-attachments/assets/8361e7f8-211a-4f28-9d53-eaf84b85b432" />
 
+### Status Page
+
+<img width="1223" height="1043" alt="image" src="https://github.com/user-attachments/assets/99a876e7-c62b-4e31-8320-7fd0c744ae6f" />
+
+
 ## How It Works
 
 ``` text
