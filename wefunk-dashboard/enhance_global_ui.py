@@ -207,6 +207,7 @@ BODY_TOP = """
   <a href="/years.html">📅 Years</a>
   <a href="/recent-matches.html">🆕 Recent</a>
   <a href="/listening.html">🎧 Listening</a>
+  <a href="/status.html">🟢 Status</a>
 
   <div class="nav-dropdown">
     <button

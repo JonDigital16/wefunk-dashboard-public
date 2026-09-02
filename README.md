@@ -447,6 +447,26 @@ for a simple HTTP health check.
                                       and update workflow
   -----------------------------------------------------------------------
 
+## Status Page
+
+WEFUNK Dashboard includes a read-only system status page at:
+
+    /status.html
+
+It also generates a machine-readable JSON endpoint:
+
+    /status.json
+
+The status page summarizes the health of the main dashboard components, including the dashboard service, local HTTP response, SQLite database integrity, generated site files, search index, content counts, Now Playing, Listening History, recovery snapshots, and recovery storage.
+
+The overall state is reported as `healthy`, `degraded`, or `unhealthy`.
+
+The status generator runs automatically as part of the normal dashboard build. It can also be run directly with:
+
+    python3 wefunk-dashboard/generate_status_page.py
+
+The status page is intentionally read-only and does not expose restart, restore, repair, or other administrative controls.
+
 ## Recovery Toolkit
 
 WEFUNK Dashboard includes a recovery toolkit for creating independent,

@@ -43,5 +43,6 @@ build_search_index.py
 generate_search_page.py
 fix_album_cover_paths.py
 normalize_artist_display_names.py
+generate_status_page.py
 enhance_global_ui.py
 validate_site.py
