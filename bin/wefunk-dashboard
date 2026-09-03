@@ -50,6 +50,7 @@ rm -rf "$NEXT"
 mkdir -p "$NEXT"
 
 export WEFUNK_PROJECT_ROOT="$ROOT"
+export WEFUNK_LIVE_SITE_DIR="$LIVE"
 export WEFUNK_SITE_DIR="$NEXT"
 
 while IFS= read -r step || [ -n "$step" ]; do

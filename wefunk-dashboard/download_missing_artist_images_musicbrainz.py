@@ -99,6 +99,7 @@ TIMEOUT = 45
 # Known Navidrome placeholder discovered in the earlier audit.
 PLACEHOLDER_HASHES = {
     "f6bc764cfbad7e0a4c6e79cc2edec0e1",
+    "09898d62df8298226b21cf8fde1c9f54",
 }
 
 REPORT_DIR.mkdir(

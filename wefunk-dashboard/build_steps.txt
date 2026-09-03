@@ -3,6 +3,8 @@ enrich_owned_tracks_metadata.py
 canonicalize_album_metadata.py
 build_album_index.py
 export_episode_art.py
+preserve_artist_images.py
+preserve_artist_bios.py
 generate_dashboard.py
 export_recent_matches.py
 generate_recent_matches_page.py
