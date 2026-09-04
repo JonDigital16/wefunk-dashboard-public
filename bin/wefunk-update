@@ -33,14 +33,20 @@ fi
 echo "🎵 WEFUNK update: latest JSON + existing library index + safe dashboard rebuild"
 
 echo
-echo "1/2 Running WEFUNK engine with existing library index..."
+echo "1/3 Running WEFUNK engine with existing library index..."
 "$PYTHON" -u \
 "${WEFUNK_ENGINE_SCRIPT:-$ROOT/wefunk-engine/wefunk_engine.py}" \
 --skip-library-index
 
 echo
-echo "2/2 Rebuilding dashboard safely..."
+echo "2/3 Rebuilding dashboard safely..."
 "$ROOT/bin/wefunk-dashboard"
+
+echo
+echo "3/3 Refreshing Navidrome WEFUNK playlists..."
+"$PYTHON" \
+"$ROOT/wefunk-dashboard/generate_navidrome_playlists.py" \
+--apply
 
 echo
 echo "✅ WEFUNK update complete."

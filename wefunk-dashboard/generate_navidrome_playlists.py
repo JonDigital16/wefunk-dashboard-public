@@ -22,6 +22,7 @@ GENRE_MIN_TRACKS = 5
 ARTIST_MIN_TRACKS = 5
 FAVORITES_MIN_PLAYS = 2
 HEAVY_ROTATION_MIN_EPISODES = 5
+MOST_PLAYED_LIMIT = 250
 EPISODE_RANGE_SIZE = 100
 
 
@@ -263,6 +264,9 @@ def prepare_tracks(connection, music_root: Path):
             except (TypeError, ValueError):
                 pass
 
+        stat = path.stat()
+        library_added_at = getattr(stat, "st_birthtime", None)
+
         tracks.append(
             {
                 "host_path": path,
@@ -274,6 +278,11 @@ def prepare_tracks(connection, music_root: Path):
                 "numeric_shows": numeric_shows,
                 "episode_count": len(item["shows"]),
                 "favorite_plays": favorite_counts.get(raw_path, 0),
+                "library_added_at": (
+                    int(library_added_at)
+                    if library_added_at is not None
+                    else None
+                ),
             }
         )
 
@@ -458,7 +467,7 @@ def build_playlists(
             -track["episode_count"],
             *sort_alpha(track),
         ),
-    )
+    )[:MOST_PLAYED_LIMIT]
 
     playlists["WEFUNK - Deep Cuts"] = sorted(
         [
@@ -497,15 +506,23 @@ def build_playlists(
     for days in (30, 90):
         cutoff = now - (days * 86400)
 
-        recent = [
-            track
-            for track in tracks
-            if int(
+        def discovery_time(track):
+            library_added_at = track.get("library_added_at")
+
+            if library_added_at is not None:
+                return int(library_added_at)
+
+            return int(
                 state["first_seen"].get(
                     track["relative_path"].as_posix(),
                     now,
                 )
-            ) >= cutoff
+            )
+
+        recent = [
+            track
+            for track in tracks
+            if discovery_time(track) >= cutoff
         ]
 
         playlists[
@@ -513,12 +530,7 @@ def build_playlists(
         ] = sorted(
             recent,
             key=lambda track: (
-                -int(
-                    state["first_seen"].get(
-                        track["relative_path"].as_posix(),
-                        now,
-                    )
-                ),
+                -discovery_time(track),
                 *sort_alpha(track),
             ),
         )
@@ -660,6 +672,11 @@ def apply_playlists(
     for name, tracks in playlists.items():
         filename = playlist_file_name(name)
         destination = playlist_dir / filename
+
+        if not tracks:
+            if destination.exists():
+                destination.unlink()
+            continue
 
         atomic_write_text(
             destination,
